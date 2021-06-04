@@ -1,4 +1,5 @@
 import torchsparse
+import torchsparse_backend
 import torchsparse.nn as spnn
 import torchsparse.nn.functional as spf
 from torchsparse.sparse_tensor import SparseTensor
@@ -21,17 +22,23 @@ def initial_voxelize(z, init_res, after_res):
     idx_query = spf.sphashquery(pc_hash, sparse_hash)
     counts = spf.spcount(idx_query.int(), len(sparse_hash))
 
-    inserted_coords = spf.spvoxelize(torch.floor(new_float_coord), idx_query,
+    if "cuda" in str(z.C.device):
+        inserted_coords = spf.spvoxelize(torch.floor(new_float_coord), idx_query,
                                    counts)
-    inserted_coords = torch.round(inserted_coords).int()
-    inserted_feat = spf.spvoxelize(z.F, idx_query, counts)
+        inserted_coords = torch.round(inserted_coords).int(); 
+        inserted_feat = spf.spvoxelize(z.F, idx_query, counts)
+    else:
+        inserted_coords = torchsparse_backend.cpu_insertion_forward(
+                    torch.floor(new_float_coord).contiguous(), idx_query.int().contiguous(), counts)
+        inserted_coords = torch.round(inserted_coords).int(); 
+        inserted_feat = torchsparse_backend.cpu_insertion_forward(
+                    z.F.contiguous(), idx_query.int().contiguous(), counts)
 
     new_tensor = SparseTensor(inserted_feat, inserted_coords, 1)
     new_tensor.check()
     z.additional_features['idx_query'][1] = idx_query
     z.additional_features['counts'][1] = counts
     z.C = new_float_coord
-
     return new_tensor
 
 
@@ -55,7 +62,11 @@ def point_to_voxel(x, z):
         idx_query = z.additional_features['idx_query'][x.s]
         counts = z.additional_features['counts'][x.s]
 
-    inserted_feat = spf.spvoxelize(z.F, idx_query, counts)
+    if "cuda" in str(z.C.device):
+        inserted_feat = spf.spvoxelize(z.F, idx_query, counts)
+    else:
+        inserted_feat = torchsparse_backend.cpu_insertion_forward(
+            z.F.contiguous(), idx_query.int().contiguous(), counts.contiguous())
     new_tensor = SparseTensor(inserted_feat, x.C, x.s)
     new_tensor.coord_maps = x.coord_maps
     new_tensor.kernel_maps = x.kernel_maps

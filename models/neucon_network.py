@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchsparse.point_tensor import PointTensor
-from loguru import logger
+import logging as logger
 
 from models.modules import SPVCNN
 from utils import apply_log_transform
@@ -114,7 +114,7 @@ class NeuConNet(nn.Module):
 
             if i == 0:
                 # ----generate new coords----
-                coords = generate_grid(self.cfg.N_VOX, interval)[0]
+                coords = generate_grid(self.cfg.N_VOX, interval, device=features[0][0].device)[0]
                 up_coords = []
                 for b in range(bs):
                     up_coords.append(torch.cat([torch.ones(1, coords.shape[-1]).to(coords.device) * b, coords]))
@@ -240,7 +240,7 @@ class NeuConNet(nn.Module):
         n_p = occ_target.sum()
         if n_p == 0:
             logger.warning('target: no valid voxel when computing loss')
-            return torch.Tensor([0.0]).cuda()[0] * tsdf.sum()
+            return torch.Tensor([0.0]).to(tsdf.device)[0] * tsdf.sum()
         w_for_1 = (n_all - n_p).float() / n_p
         w_for_1 *= pos_weight
 

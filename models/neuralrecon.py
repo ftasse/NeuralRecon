@@ -69,7 +69,7 @@ class NeuralRecon(nn.Module):
             'total_loss':              (Tensor), total loss
         }
         '''
-        inputs = tocuda(inputs)
+        # inputs = tocuda(inputs) # Comment out so we can support inferences on CPU
         outputs = {}
         imgs = torch.unbind(inputs['imgs'], 1)
 

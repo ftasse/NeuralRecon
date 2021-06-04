@@ -1,3 +1,8 @@
+
+# A Fork of NeuralRecon For CPU inference support
+
+Check the rest of the documentation below for more details on neuralrecon. Note that for this fork, you should use this [pretrained model checkpoint](wget --quiet https://xstreem-public-assets.s3-us-west-2.amazonaws.com/third-party-mlmodels/neuralrecon/modelcpugpu_000047.ckpt) to support inference on both CPU & GPU.
+
 # NeuralRecon: Real-Time Coherent 3D Reconstruction from Monocular Video
 ### [Project Page](https://zju3dv.github.io/neuralrecon) | [Paper](https://arxiv.org/pdf/2104.00681.pdf)
 <br/>

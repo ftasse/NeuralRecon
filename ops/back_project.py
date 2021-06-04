@@ -21,9 +21,10 @@ def back_project(coords, origin, voxel_size, feats, KRcam):
     dim: (num of voxels,)
     '''
     n_views, bs, c, h, w = feats.shape
-
-    feature_volume_all = torch.zeros(coords.shape[0], c + 1).cuda()
-    count = torch.zeros(coords.shape[0]).cuda()
+    
+    device = coords.device
+    feature_volume_all = torch.zeros(coords.shape[0], c + 1).to(device)
+    count = torch.zeros(coords.shape[0]).to(device)
 
     for batch in range(bs):
         batch_ind = torch.nonzero(coords[:, 0] == batch).squeeze(1)
@@ -38,7 +39,7 @@ def back_project(coords, origin, voxel_size, feats, KRcam):
         rs_grid = grid_batch.unsqueeze(0).expand(n_views, -1, -1)
         rs_grid = rs_grid.permute(0, 2, 1).contiguous()
         nV = rs_grid.shape[-1]
-        rs_grid = torch.cat([rs_grid, torch.ones([n_views, 1, nV]).cuda()], dim=1)
+        rs_grid = torch.cat([rs_grid, torch.ones([n_views, 1, nV]).to(device)], dim=1)
 
         # Project grid
         im_p = proj_batch @ rs_grid

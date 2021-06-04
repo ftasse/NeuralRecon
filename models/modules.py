@@ -145,11 +145,11 @@ class SPVCNN(nn.Module):
     def forward(self, z):
         # x: SparseTensor z: PointTensor
         x0 = initial_voxelize(z, self.pres, self.vres)
-
+        x0_ = self.stem[0](x0)
         x0 = self.stem(x0)
         z0 = voxel_to_point(x0, z, nearest=False)
         z0.F = z0.F
-
+        
         x1 = point_to_voxel(x0, z0)
         x1 = self.stage1(x1)
         x2 = self.stage2(x1)
@@ -168,7 +168,6 @@ class SPVCNN(nn.Module):
         y4 = self.up2[1](y4)
         z3 = voxel_to_point(y4, z1)
         z3.F = z3.F + self.point_transforms[1](z1.F)
-
         return z3.F
 
 

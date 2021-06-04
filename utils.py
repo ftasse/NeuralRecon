@@ -4,7 +4,7 @@ import trimesh
 import numpy as np
 import torchvision.utils as vutils
 from skimage import measure
-from loguru import logger
+import logging as logger
 from tools.render import Visualizer
 import cv2
 
