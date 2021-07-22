@@ -102,7 +102,7 @@ else:
     paddingZ = 0
 
 transform = []
-transform += [transforms.ResizeImage((640, 480)),
+transform += [#transforms.ResizeImage((640, 480)),
               transforms.ToTensor(),
               transforms.RandomTransformSpace(
                   cfg.MODEL.N_VOX, cfg.MODEL.VOXEL_SIZE, random_rotation, random_translation,
@@ -202,7 +202,9 @@ def train():
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             do_summary = global_step % cfg.SUMMARY_FREQ == 0
             start_time = time.time()
-            loss, scalar_outputs = train_sample(sample)
+            if True: # try:
+                loss, scalar_outputs = train_sample(sample)
+            # except Exception as e:  print(e); continue
             if is_main_process():
                 logger.info(
                     'Epoch {}/{}, Iter {}/{}, train loss = {:.3f}, time = {:.3f}'.format(epoch_idx, cfg.TRAIN.EPOCHS,
