@@ -60,16 +60,17 @@ update_config(cfg, args)
 
 cfg.defrost()
 num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
+local_rank = int(os.environ["LOCAL_RANK"]) if "LOCAL_RANK" in os.environ else args.local_rank
 print('number of gpus: {}'.format(num_gpus))
 cfg.DISTRIBUTED = num_gpus > 1
 
 if cfg.DISTRIBUTED:
-    torch.cuda.set_device(args.local_rank)
+    torch.cuda.set_device(local_rank)
     torch.distributed.init_process_group(
         backend="nccl", init_method="env://"
     )
     synchronize()
-cfg.LOCAL_RANK = args.local_rank
+cfg.LOCAL_RANK = local_rank
 cfg.freeze()
 
 torch.manual_seed(cfg.SEED)
@@ -102,7 +103,7 @@ else:
     paddingZ = 0
 
 transform = []
-transform += [#transforms.ResizeImage((640, 480)),
+transform += [transforms.ResizeImage((640, 480)),
               transforms.ToTensor(),
               transforms.RandomTransformSpace(
                   cfg.MODEL.N_VOX, cfg.MODEL.VOXEL_SIZE, random_rotation, random_translation,
@@ -202,9 +203,7 @@ def train():
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             do_summary = global_step % cfg.SUMMARY_FREQ == 0
             start_time = time.time()
-            if True: # try:
-                loss, scalar_outputs = train_sample(sample)
-            # except Exception as e:  print(e); continue
+            loss, scalar_outputs = train_sample(sample)
             if is_main_process():
                 logger.info(
                     'Epoch {}/{}, Iter {}/{}, train loss = {:.3f}, time = {:.3f}'.format(epoch_idx, cfg.TRAIN.EPOCHS,
