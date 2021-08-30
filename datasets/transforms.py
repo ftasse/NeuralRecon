@@ -18,13 +18,17 @@
 # limitations under the License.
 
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 import numpy as np
 from utils import coordinates
 import transforms3d
 import torch
+import torchvision
 from tools.tsdf_fusion.fusion import TSDFVolumeTorch
 
+import random
+import cv2
+from scipy.spatial.transform import Rotation
 
 class Compose(object):
     """ Apply a list of transforms sequentially"""
@@ -134,7 +138,82 @@ class ResizeImage(object):
     def __repr__(self):
         return self.__class__.__name__ + '(size={0})'.format(self.size)
 
+class RandomAugmentFragment(object):
+    """ Flip frames, and/or downscale frames and/or flip the order of frames
+    """
 
+    def __init__(self):
+        self.rotz_90 = np.eye(4); 
+        self.rotz_90[:3,:3] = Rotation.from_rotvec(np.pi/2 * np.array([0, 0, 1])).as_matrix()
+    
+        self.image_transforms = torchvision.transforms.Compose([
+             torchvision.transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.2),
+             # torchvision.transforms.RandomAdjustSharpness(random.uniform(0.5, 2.0), p=0.5),
+             # torchvision.transforms.RandomAutocontrast(p=0.5),
+             # torchvision.transforms.RandomEqualize(p=0.5)
+        ])
+        
+    def augment_images(self, imgs):
+        imgs = [img.filter(ImageFilter.GaussianBlur(random.randint(0,3))) for img in imgs]
+        imgs =  [self.image_transforms(img) for img in imgs]
+        return imgs
+
+    def __call__(self, data):
+        rsteps = random.randint(0,1)*2
+        random_downsample = random.randint(0,2)
+            
+        for i, im in enumerate(data['imgs']):
+            K = data['intrinsics'][i].copy()
+            cam_pose = data['extrinsics'][i].copy()
+            depth_cur = data['depth'][i].copy()
+            if rsteps > 0:
+                for rstep in range(rsteps):
+                    fx, fy, cx, cy = K[0,0], K[1,1], K[0,2], K[1,2]
+                    cam_pose = np.matmul(cam_pose, self.rotz_90)
+                    data['imgs'][i] = data['imgs'][i].transpose(Image.ROTATE_90) #.rotate(90, expand = True)
+                    depth_cur = cv2.rotate(depth_cur, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    K = np.eye(K.shape[0]); K[0,0], K[1,1], K[0,2], K[1,2] = fy, fx, cy, (data['imgs'][i].size[1]-1)-cx
+            if random_downsample:
+                target = 640//(2**random_downsample)
+                sc = (max(data['imgs'][i].size[:2])//target)
+                if sc > 0:
+                    K[:2,:] /= sc
+                    data['imgs'][i] = data['imgs'][i].resize((data['imgs'][i].size[0]//sc,data['imgs'][i].size[1]//sc))
+            data['intrinsics'][i] = K
+            data['extrinsics'][i] = cam_pose
+            data['depth'][i] = depth_cur
+            
+        random_flip = random.randint(0,2)
+        if random_flip > 0:
+            if random_flip == 1: # left to right
+                reflect = np.array([[-1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]])
+                for k in range(len(data['imgs'])):
+                    data['imgs'][k] = data['imgs'][k].transpose(Image.FLIP_LEFT_RIGHT)
+                    data['depth'][k] = cv2.flip(data['depth'][k], 1)
+                    data['extrinsics'][k] = data['extrinsics'][k] @ reflect
+            elif random_flip == 2: # up to down
+                reflect = np.array([[1.0,0.0,0.0,0.0],[0.0,-1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]])
+                for k in range(len(data['imgs'])):
+                    data['imgs'][k] = data['imgs'][k].transpose(Image.FLIP_TOP_BOTTOM)
+                    data['depth'][k] = cv2.flip(data['depth'][k], 0)
+                    data['extrinsics'][k] = data['extrinsics'][k] @ reflect
+            
+        random_order_flip = random.randint(0,4)
+        order = list(range(9));
+        if random_order_flip > 0:
+            if random_order_flip == 1: order = order[::-1]
+            else: random.shuffle(order)
+        data['imgs'] = self.augment_images([data['imgs'][r] for r in order])
+        data['depth'] = [data['depth'][r] for r in order]
+        data['intrinsics'] = data['intrinsics'][order].copy()
+        data['extrinsics'] = data['extrinsics'][order].copy()
+        
+        # for k in data: print(k, type(data[k]))
+        return data
+
+    def __repr__(self):
+        return self.__class__.__name__ 
+    
 class RandomTransformSpace(object):
     """ Apply a random 3x4 linear transform to the world coordinate system.
         This affects pose as well as TSDFs.

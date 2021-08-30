@@ -77,31 +77,7 @@ class ScanNetDataset(Dataset):
         intrinsics_list = []
 
         tsdf_list = self.read_scene_volumes(os.path.join(self.datapath, self.tsdf_file), meta['scene'])
-        
-#         for i, vid in enumerate(meta['image_ids']):
-#             # load images
-#             imgs.append(
-#                 self.read_img(
-#                     os.path.join(self.datapath, self.source_path, meta['scene'], 'color', '{}.jpg'.format(vid))))
 
-#             depth.append(
-#                 self.read_depth(
-#                     os.path.join(self.datapath, self.source_path, meta['scene'], 'depth', '{}.png'.format(vid)))
-#             )
-
-#             # load intrinsics and extrinsics
-#             intrinsics, extrinsics = self.read_cam_file(os.path.join(self.datapath, self.source_path, meta['scene']),
-#                                                         vid)
-
-#             intrinsics_list.append(intrinsics)
-#             extrinsics_list.append(extrinsics)
-
-        
-
-        rotz_90 = np.eye(4); rotz_90[:3,:3] = Rotation.from_rotvec(np.pi/2 * np.array([0, 0, 1])).as_matrix()
-        rsteps = random.randint(0,1)*2
-        random_downsample = random.randint(0,2)
-        
         for i, vid in enumerate(meta['image_ids']):
             # load images
             imgs.append(
@@ -119,25 +95,7 @@ class ScanNetDataset(Dataset):
 
             intrinsics_list.append(intrinsics)
             extrinsics_list.append(extrinsics)
-            
-            K = intrinsics_list[-1].copy()
-            cam_pose = extrinsics_list[-1].copy()
-            depth_cur = depth[-1].copy()
-            if rsteps > 0:
-                for rstep in range(rsteps):
-                    fx, fy, cx, cy = K[0,0], K[1,1], K[0,2], K[1,2]
-                    cam_pose = np.matmul(cam_pose, rotz_90)
-                    imgs[-1] = imgs[-1].rotate(90, expand = True)
-                    depth_cur = cv2.rotate(depth_cur, cv2.ROTATE_90_COUNTERCLOCKWISE)
-                    K = np.eye(K.shape[0]); K[0,0], K[1,1], K[0,2], K[1,2] = fy, fx, cy, (imgs[-1].size[1]-1)-cx
-            if random_downsample:
-                sc = (2*random_downsample)
-                K[:2,:] /= sc
-                imgs[-1] = imgs[-1].resize((imgs[-1].size[0]//sc,imgs[-1].size[1]//sc))
-            intrinsics_list[-1] = K
-            extrinsics_list[-1] = cam_pose
-            depth[-1] = depth_cur
-
+        
         intrinsics = np.stack(intrinsics_list)
         extrinsics = np.stack(extrinsics_list)
         

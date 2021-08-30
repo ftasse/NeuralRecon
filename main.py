@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 import datetime
+import random
 
 import torch
 import torch.distributed as dist
@@ -102,7 +103,7 @@ else:
     paddingXY = 0
     paddingZ = 0
 
-transform = []
+transform = [transforms.RandomAugmentFragment()] if cfg.MODE == 'train' else []
 transform += [transforms.ResizeImage((640, 480)),
               transforms.ToTensor(),
               transforms.RandomTransformSpace(
@@ -203,6 +204,10 @@ def train():
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             do_summary = global_step % cfg.SUMMARY_FREQ == 0
             start_time = time.time()
+            cutout = random.randint(5,9)
+            sample['imgs'] = sample['imgs'][:,:cutout]
+            sample['proj_matrices'] = sample['proj_matrices'][:,:cutout]
+            if 'depth' in sample: sample['depth'] = sample['depth'][:,:cutout]
             loss, scalar_outputs = train_sample(sample)
             if is_main_process():
                 logger.info(
